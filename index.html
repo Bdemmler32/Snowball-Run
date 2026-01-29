@@ -563,6 +563,7 @@
                     <li>• Start at size 3, grow to max size 20</li>
                     <li>• Each collision reduces size by 1</li>
                     <li>• Game over when size reaches 0</li>
+                    <li>• Collect snow mounds for +1 size!</li>
                     <li>• Survive as long as possible!</li>
                 </ul>
             </div>
@@ -967,8 +968,9 @@
                 localStorage.setItem('playerName', playerName);
             }
             
-            // Update the run in Firebase
-            await saveRunToFirebase(score, collisions, currentMaxSize, playerName);
+            // Save the run to Firebase (creates new run or updates existing name entry)
+            const runId = await saveRunToFirebase(score, collisions, currentMaxSize, playerName);
+            currentRunId = runId;
             
             // Mark run as logged
             runHasBeenLogged = true;
@@ -990,7 +992,7 @@
             document.getElementById('leaderboard-body').innerHTML = '<div class="loading">Loading leaderboard...</div>';
             
             try {
-                const snapshot = await database.ref('runs').orderByChild('distance').limitToLast(20).once('value');
+                const snapshot = await database.ref('runs').orderByChild('distance').limitToLast(10).once('value');
                 const runs = [];
                 
                 snapshot.forEach((childSnapshot) => {
@@ -1052,10 +1054,10 @@
                     </table>
                 `;
                 
-                // If current run is not in top 20, show their rank
+                // If current run is not in top 10, show their rank
                 if (currentRunId) {
-                    const currentRunInTop20 = runs.some(run => run.id === currentRunId);
-                    if (!currentRunInTop20) {
+                    const currentRunInTop10 = runs.some(run => run.id === currentRunId);
+                    if (!currentRunInTop10) {
                         const allSnapshot = await database.ref('runs').orderByChild('distance').once('value');
                         const allRuns = [];
                         allSnapshot.forEach((childSnapshot) => {
@@ -1495,52 +1497,71 @@
         function drawSnowFluff(fluff) {
             // Animate pulse effect
             fluff.pulsePhase += 0.05;
-            const pulseScale = 1 + Math.sin(fluff.pulsePhase) * 0.15;
+            const pulseScale = 1 + Math.sin(fluff.pulsePhase) * 0.1;
             const currentSize = fluff.size * pulseScale;
             
-            // Soft glow effect
+            // Soft glow effect below the mound
             const glowGradient = ctx.createRadialGradient(
                 fluff.x, fluff.y, 0,
-                fluff.x, fluff.y, currentSize * 1.5
+                fluff.x, fluff.y, currentSize * 1.8
             );
-            glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-            glowGradient.addColorStop(0.5, 'rgba(200, 230, 255, 0.2)');
+            glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            glowGradient.addColorStop(0.5, 'rgba(200, 230, 255, 0.15)');
             glowGradient.addColorStop(1, 'rgba(200, 230, 255, 0)');
             ctx.fillStyle = glowGradient;
             ctx.beginPath();
-            ctx.arc(fluff.x, fluff.y, currentSize * 1.5, 0, Math.PI * 2);
+            ctx.arc(fluff.x, fluff.y, currentSize * 1.8, 0, Math.PI * 2);
             ctx.fill();
             
-            // Main snow mound with gradient
+            // Draw mound as top half of circle (semi-circle)
             const moundGradient = ctx.createRadialGradient(
-                fluff.x - currentSize * 0.3, fluff.y - currentSize * 0.3, currentSize * 0.1,
-                fluff.x, fluff.y, currentSize
+                fluff.x - currentSize * 0.3, fluff.y - currentSize * 0.2, currentSize * 0.1,
+                fluff.x, fluff.y, currentSize * 1.3
             );
             moundGradient.addColorStop(0, '#FFFFFF');
-            moundGradient.addColorStop(0.6, '#F0F8FF');
+            moundGradient.addColorStop(0.5, '#F0F8FF');
             moundGradient.addColorStop(1, '#E0EFF8');
+            
             ctx.fillStyle = moundGradient;
             ctx.beginPath();
-            ctx.arc(fluff.x, fluff.y, currentSize, 0, Math.PI * 2);
+            // Draw arc from left to right (top half of circle)
+            ctx.arc(fluff.x, fluff.y, currentSize * 1.3, Math.PI, 0, false);
+            ctx.closePath();
             ctx.fill();
             
-            // Subtle outline
-            ctx.strokeStyle = 'rgba(200, 230, 255, 0.5)';
+            // Add subtle shadow at base
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.beginPath();
+            ctx.ellipse(fluff.x, fluff.y + 2, currentSize * 1.2, currentSize * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Subtle outline on mound
+            ctx.strokeStyle = 'rgba(200, 230, 255, 0.4)';
             ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(fluff.x, fluff.y, currentSize * 1.3, Math.PI, 0, false);
             ctx.stroke();
             
             // Add sparkle points
-            const numSparkles = 4;
+            const numSparkles = 3;
             for (let i = 0; i < numSparkles; i++) {
-                const sparkleAngle = (Math.PI * 2 * i) / numSparkles + fluff.pulsePhase * 0.5;
-                const sparkleDistance = currentSize * 0.6;
+                const sparkleAngle = Math.PI + (Math.PI * (i + 1)) / (numSparkles + 1) + fluff.pulsePhase * 0.3;
+                const sparkleDistance = currentSize * 1.0;
                 const sparkleX = fluff.x + Math.cos(sparkleAngle) * sparkleDistance;
                 const sparkleY = fluff.y + Math.sin(sparkleAngle) * sparkleDistance;
                 const sparkleSize = 1.5 + Math.sin(fluff.pulsePhase * 2 + i) * 0.5;
                 
+                // Star sparkle
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
                 ctx.beginPath();
-                ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+                for (let p = 0; p < 4; p++) {
+                    const angle = (Math.PI / 2) * p + fluff.pulsePhase;
+                    const x = sparkleX + Math.cos(angle) * sparkleSize;
+                    const y = sparkleY + Math.sin(angle) * sparkleSize;
+                    if (p === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
                 ctx.fill();
             }
         }
@@ -1681,10 +1702,7 @@
                             localStorage.setItem('snowballHighScore', highScore);
                         }
                         
-                        // Auto-save run to Firebase
-                        saveRunToFirebase(score, collisions, currentMaxSize).then(runId => {
-                            currentRunId = runId;
-                        });
+                        // Don't auto-save - wait for user to click "Log Run"
                         
                         showScreen('gameover');
                         return false;
