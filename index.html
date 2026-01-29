@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>❄️ Snowball Run</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(to bottom, #bfdbfe, #ffffff);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            text-align: center;
+        }
+        
+        .menu-screen, .gameover-screen {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 400px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        h1 {
+            color: #2563eb;
+            font-size: 2.5em;
+            margin-bottom: 16px;
+        }
+        
+        h2 {
+            color: #dc2626;
+            font-size: 2em;
+            margin-bottom: 16px;
+        }
+        
+        p {
+            color: #374151;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+        
+        .instructions {
+            background: #eff6ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        
+        .instructions ul {
+            list-style: none;
+            font-size: 0.9em;
+        }
+        
+        .instructions li {
+            margin: 8px 0;
+        }
+        
+        button {
+            background: #3b82f6;
+            color: white;
+            font-weight: bold;
+            padding: 16px 32px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin: 8px;
+        }
+        
+        button:hover {
+            background: #2563eb;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+        
+        canvas {
+            border: 4px solid #93c5fd;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            touch-action: none;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .game-hud {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .hud-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        
+        .hud-label {
+            font-size: 0.75em;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+        
+        .hud-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .touch-slider {
+            width: 100%;
+            max-width: 400px;
+            height: 60px;
+            position: relative;
+            margin-top: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .slider-track {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            right: 20px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 2px;
+            transform: translateY(-50%);
+        }
+        
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease-out;
+            left: 50%;
+        }
+        
+        .slider-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .score-display {
+            margin: 20px 0;
+        }
+        
+        .score-display p {
+            font-size: 1.3em;
+            margin: 8px 0;
+        }
+        
+        .score-display span {
+            font-weight: bold;
+            color: #2563eb;
+        }
+        
+        .high-score {
+            color: #16a34a;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin: 12px 0;
+        }
+        
+        .new-record {
+            color: #16a34a;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .last-run {
+            background: #f3f4f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .last-run h3 {
+            font-size: 1em;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .last-run p {
+            font-size: 1.1em;
+            margin: 4px 0;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="menu-screen" class="menu-screen">
+            <h1>❄️ Snowball Run</h1>
+            <p>Roll down the endless hill! Avoid obstacles to keep your snowball intact.</p>
+            <div class="instructions">
+                <h3>How to Play:</h3>
+                <ul>
+                    <li>• Swipe or drag to move the snowball</li>
+                    <li>• Start at size 3, grow to max size 10</li>
+                    <li>• Each collision reduces size by 1</li>
+                    <li>• Game over when size reaches 0</li>
+                    <li>• Survive as long as possible!</li>
+                </ul>
+            </div>
+            <div id="last-run-stats" class="last-run hidden">
+                <h3>Last Run:</h3>
+                <p>Distance: <span id="last-distance">0</span></p>
+                <p>Collisions: <span id="last-collisions">0</span></p>
+            </div>
+            <p id="high-score-display" class="high-score hidden"></p>
+            <button onclick="startGame()">Start New Run</button>
+        </div>
+        
+        <div id="game-hud" class="game-hud hidden">
+            <div class="hud-item">
+                <span class="hud-label">Distance:</span>
+                <span class="hud-value" id="hud-distance">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">Size:</span>
+                <span class="hud-value" id="hud-size">3.0/10</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">Collisions:</span>
+                <span class="hud-value" id="hud-collisions">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">Speed:</span>
+                <span class="hud-value" id="hud-speed">8.4</span>
+            </div>
+        </div>
+        
+        <canvas id="game-canvas" class="hidden"></canvas>
+        
+        <div id="touch-slider" class="touch-slider hidden">
+            <div class="slider-track"></div>
+            <div class="slider-handle" id="slider-handle"></div>
+        </div>
+        
+        <div id="gameover-screen" class="gameover-screen hidden">
+            <h2>Game Over!</h2>
+            <div class="score-display">
+                <p>Distance: <span id="final-score">0</span></p>
+                <p>Collisions: <span id="final-collisions">0</span></p>
+                <p id="new-record" class="new-record hidden">🏆 New High Score!</p>
+                <p id="current-high-score" class="hidden"></p>
+            </div>
+            <button onclick="startGame()">Start New Run</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'menu';
+        let score = 0;
+        let collisions = 0;
+        let highScore = localStorage.getItem('snowballHighScore') || 0;
+        let lastRunDistance = 0;
+        let lastRunCollisions = 0;
+        
+        // Separate touch position tracking (doesn't affect game speed at all)
+        let currentTouchX = null;
+        let touchOffsetX = 0;
+        
+        // Snow trail particles
+        let snowTrail = [];
+        
+        let game = {
+            snowball: { x: 150, y: 100, size: 3, maxSize: 10 },
+            obstacles: [],
+            baseScrollSpeed: 8.4,
+            scrollSpeed: 8.4,
+            obstacleSpawnTimer: 0,
+            distance: 0,
+            animationId: null,
+            lastFrameTime: 0
+        };
+        
+        function resizeCanvas() {
+            canvas.width = Math.min(window.innerWidth - 40, 400);
+            canvas.height = Math.min(window.innerHeight - 140, 600);
+            game.snowball.x = canvas.width / 2;
+        }
+        
+        function showScreen(screen) {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('game-canvas').classList.add('hidden');
+            document.getElementById('game-hud').classList.add('hidden');
+            document.getElementById('touch-slider').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            
+            if (screen === 'menu') {
+                document.getElementById('menu-screen').classList.remove('hidden');
+                if (highScore > 0) {
+                    document.getElementById('high-score-display').classList.remove('hidden');
+                    document.getElementById('high-score-display').textContent = `High Score: ${highScore}`;
+                }
+                
+                if (lastRunDistance > 0) {
+                    document.getElementById('last-run-stats').classList.remove('hidden');
+                    document.getElementById('last-distance').textContent = lastRunDistance;
+                    document.getElementById('last-collisions').textContent = lastRunCollisions;
+                }
+            } else if (screen === 'playing') {
+                document.getElementById('game-hud').classList.remove('hidden');
+                document.getElementById('game-canvas').classList.remove('hidden');
+                document.getElementById('touch-slider').classList.remove('hidden');
+            } else if (screen === 'gameover') {
+                document.getElementById('gameover-screen').classList.remove('hidden');
+                document.getElementById('final-score').textContent = score;
+                document.getElementById('final-collisions').textContent = collisions;
+                
+                if (score >= highScore && score > 0) {
+                    document.getElementById('new-record').classList.remove('hidden');
+                    document.getElementById('current-high-score').classList.add('hidden');
+                } else if (highScore > 0) {
+                    document.getElementById('new-record').classList.add('hidden');
+                    document.getElementById('current-high-score').classList.remove('hidden');
+                    document.getElementById('current-high-score').textContent = `High Score: ${highScore}`;
+                }
+            }
+        }
+        
+        function updateSliderPosition() {
+            const sliderHandle = document.getElementById('slider-handle');
+            const percentage = (game.snowball.x / canvas.width) * 100;
+            sliderHandle.style.left = `${percentage}%`;
+        }
+        
+        function updateHUD() {
+            document.getElementById('hud-distance').textContent = score;
+            document.getElementById('hud-size').textContent = `${game.snowball.size.toFixed(1)}/${game.snowball.maxSize}`;
+            document.getElementById('hud-collisions').textContent = collisions;
+            document.getElementById('hud-speed').textContent = game.scrollSpeed.toFixed(1);
+        }
+        
+        // Allow touch anywhere on screen (not just canvas)
+        document.addEventListener('touchstart', (e) => {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            
+            const touchX = e.touches[0].clientX;
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = touchX - rect.left;
+            
+            touchOffsetX = game.snowball.x - canvasX;
+            currentTouchX = canvasX;
+        }, { passive: false });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            
+            if (currentTouchX === null) return;
+            
+            const touchX = e.touches[0].clientX;
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = touchX - rect.left;
+            
+            game.snowball.x = canvasX + touchOffsetX;
+            
+            const radius = game.snowball.size * 5;
+            game.snowball.x = Math.max(radius, Math.min(canvas.width - radius, game.snowball.x));
+            
+            currentTouchX = canvasX;
+            updateSliderPosition();
+        }, { passive: false });
+        
+        document.addEventListener('touchend', (e) => {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            currentTouchX = null;
+        }, { passive: false });
+        
+        document.addEventListener('touchcancel', (e) => {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            currentTouchX = null;
+        }, { passive: false });
+        
+        function startGame() {
+            resizeCanvas();
+            
+            game = {
+                snowball: { x: canvas.width / 2, y: 100, size: 3, maxSize: 10 },
+                obstacles: [],
+                baseScrollSpeed: 8.4,
+                scrollSpeed: 8.4,
+                obstacleSpawnTimer: 0,
+                distance: 0,
+                animationId: null,
+                lastFrameTime: performance.now()
+            };
+            
+            currentTouchX = null;
+            touchOffsetX = 0;
+            snowTrail = [];
+            
+            score = 0;
+            collisions = 0;
+            gameState = 'playing';
+            showScreen('playing');
+            
+            gameLoop(performance.now());
+        }
+        
+        // Touch event handlers - ONLY update position, never affect game state
+        function handleTouchStart(e) {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            
+            const rect = canvas.getBoundingClientRect();
+            const touchX = e.touches[0].clientX - rect.left;
+            
+            // Calculate offset from current snowball position
+            touchOffsetX = game.snowball.x - touchX;
+            currentTouchX = touchX;
+        }
+        
+        function handleTouchMove(e) {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            
+            if (currentTouchX === null) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const touchX = e.touches[0].clientX - rect.left;
+            
+            // Update snowball position with offset
+            game.snowball.x = touchX + touchOffsetX;
+            
+            // Keep in bounds
+            const radius = game.snowball.size * 5;
+            game.snowball.x = Math.max(radius, Math.min(canvas.width - radius, game.snowball.x));
+            
+            currentTouchX = touchX;
+            
+            // Update slider handle position
+            updateSliderPosition();
+        }
+        
+        function handleTouchEnd(e) {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            currentTouchX = null;
+        }
+        
+        // Add event listeners
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+        
+        // Mouse controls
+        let mouseDown = false;
+        let mouseOffsetX = 0;
+        
+        canvas.addEventListener('mousedown', (e) => {
+            if (gameState !== 'playing') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            
+            mouseOffsetX = game.snowball.x - mouseX;
+            mouseDown = true;
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            mouseDown = false;
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            mouseDown = false;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!mouseDown || gameState !== 'playing') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            
+            game.snowball.x = mouseX + mouseOffsetX;
+            
+            const radius = game.snowball.size * 5;
+            game.snowball.x = Math.max(radius, Math.min(canvas.width - radius, game.snowball.x));
+            
+            updateSliderPosition();
+        });
+        
+        function spawnObstacle() {
+            const types = ['rock', 'tree', 'log'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const size = 15 + Math.random() * 20;
+            
+            game.obstacles.push({
+                x: Math.random() * (canvas.width - size * 2) + size,
+                y: canvas.height + 50,
+                size,
+                type
+            });
+        }
+        
+        function checkCollision(snowball, obstacle) {
+            const snowballRadius = snowball.size * 5;
+            const dx = snowball.x - obstacle.x;
+            const dy = snowball.y - obstacle.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            return distance < snowballRadius + obstacle.size;
+        }
+        
+        function drawSnowball(x, y, size) {
+            const radius = size * 5;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#E0E0E0';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Add texture
+            ctx.fillStyle = '#F0F0F0';
+            for (let i = 0; i < 5; i++) {
+                const angle = (Math.PI * 2 * i) / 5 + game.distance * 0.01;
+                const dotX = x + Math.cos(angle) * radius * 0.6;
+                const dotY = y + Math.sin(angle) * radius * 0.6;
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function drawObstacle(obstacle) {
+            if (obstacle.type === 'rock') {
+                ctx.fillStyle = '#8B7355';
+                ctx.strokeStyle = '#5C4A3A';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(obstacle.x, obstacle.y, obstacle.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            } else if (obstacle.type === 'tree') {
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(obstacle.x - 5, obstacle.y - 10, 10, 20);
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.arc(obstacle.x, obstacle.y - obstacle.size, obstacle.size, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (obstacle.type === 'log') {
+                ctx.fillStyle = '#8B4513';
+                ctx.strokeStyle = '#654321';
+                ctx.lineWidth = 2;
+                ctx.fillRect(obstacle.x - obstacle.size, obstacle.y - 8, obstacle.size * 2, 16);
+                ctx.strokeRect(obstacle.x - obstacle.size, obstacle.y - 8, obstacle.size * 2, 16);
+            }
+        }
+        
+        function gameLoop(currentTime) {
+            // ALWAYS continue the loop, even if game is over (for smooth transition)
+            game.animationId = requestAnimationFrame(gameLoop);
+            
+            if (gameState !== 'playing') return;
+            
+            // Calculate delta time for consistent speed across different frame rates
+            const deltaTime = currentTime - game.lastFrameTime;
+            game.lastFrameTime = currentTime;
+            
+            // Normalize to 60 FPS (deltaTime in ms, targeting 16.67ms per frame)
+            const frameMultiplier = deltaTime / 16.67;
+            
+            // Clear canvas
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw snow on ground
+            ctx.fillStyle = '#FFFFFF';
+            for (let i = 0; i < canvas.width; i += 20) {
+                ctx.fillRect(i, canvas.height - 10, 15, 10);
+            }
+            
+            // Calculate scroll speed ONLY from snowball size
+            const sizeProgress = (game.snowball.size - 3) / (game.snowball.maxSize - 3);
+            game.scrollSpeed = game.baseScrollSpeed + (sizeProgress * 16.8); // Speed goes from 8.4 to 25.2
+            
+            // Apply frame multiplier for consistent speed
+            const actualSpeed = game.scrollSpeed * frameMultiplier;
+            
+            // Add snow trail particle
+            if (game.snowball.size > 0) {
+                snowTrail.push({
+                    x: game.snowball.x,
+                    y: game.snowball.y,
+                    size: game.snowball.size * 3,
+                    life: 1.0
+                });
+            }
+            
+            // Update and draw snow trail
+            snowTrail = snowTrail.filter(particle => {
+                particle.y -= actualSpeed * 0.3; // Trail moves up slower than obstacles
+                particle.life -= 0.02;
+                
+                if (particle.life > 0) {
+                    const alpha = particle.life * 0.5;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    return true;
+                }
+                return false;
+            });
+            
+            // Spawn obstacles
+            game.obstacleSpawnTimer += actualSpeed;
+            if (game.obstacleSpawnTimer > 100) {
+                spawnObstacle();
+                game.obstacleSpawnTimer = 0;
+            }
+            
+            // Update and draw obstacles
+            game.obstacles = game.obstacles.filter(obstacle => {
+                obstacle.y -= actualSpeed;
+                
+                // Check collision
+                if (checkCollision(game.snowball, obstacle)) {
+                    game.snowball.size--;
+                    collisions++;
+                    
+                    if (game.snowball.size <= 0) {
+                        gameState = 'gameover';
+                        score = Math.floor(game.distance);
+                        lastRunDistance = score;
+                        lastRunCollisions = collisions;
+                        
+                        if (score > highScore) {
+                            highScore = score;
+                            localStorage.setItem('snowballHighScore', highScore);
+                        }
+                        showScreen('gameover');
+                        return false;
+                    }
+                    return false;
+                }
+                
+                drawObstacle(obstacle);
+                return obstacle.y > -100;
+            });
+            
+            // Draw snowball (only if size is positive)
+            if (game.snowball.size > 0) {
+                drawSnowball(game.snowball.x, game.snowball.y, game.snowball.size);
+            }
+            
+            // Grow snowball faster over time
+            if (Math.floor(game.distance) % 200 === 0 && game.distance > 0) {
+                if (game.snowball.size < game.snowball.maxSize) {
+                    game.snowball.size = Math.min(game.snowball.maxSize, game.snowball.size + 0.1);
+                }
+            }
+            
+            // Update distance with frame-independent speed
+            game.distance += actualSpeed;
+            score = Math.floor(game.distance);
+            
+            // Update HUD display
+            updateHUD();
+        }
+        
+        // Initialize
+        window.addEventListener('resize', () => {
+            if (gameState === 'playing') {
+                resizeCanvas();
+            }
+        });
+        
+        showScreen('menu');
+    </script>
+</body>
+</html>
