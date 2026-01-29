@@ -586,6 +586,7 @@
         // Current run ID for updating after game over
         let currentRunId = null;
         let currentMaxSize = 3;
+        let runHasBeenLogged = false;
         
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
@@ -648,6 +649,14 @@
                 document.getElementById('gameover-screen').classList.remove('hidden');
                 document.getElementById('final-score').textContent = score;
                 document.getElementById('final-collisions').textContent = collisions;
+                
+                // Show or hide log button based on whether run has been logged
+                const logButton = document.querySelector('#gameover-screen button.secondary');
+                if (runHasBeenLogged) {
+                    logButton.style.display = 'none';
+                } else {
+                    logButton.style.display = 'inline-block';
+                }
                 
                 if (score >= highScore && score > 0) {
                     document.getElementById('new-record').classList.remove('hidden');
@@ -727,6 +736,45 @@
                     timestamp: Date.now()
                 };
                 
+                // If updating with a real name (not Anonymous), check if this name already exists
+                if (name !== "Anonymous") {
+                    const snapshot = await database.ref('runs').orderByChild('name').equalTo(name).once('value');
+                    
+                    if (snapshot.exists()) {
+                        // Name exists - find the best run to update
+                        let bestRunId = null;
+                        let bestDistance = -1;
+                        
+                        snapshot.forEach((childSnapshot) => {
+                            const run = childSnapshot.val();
+                            if (run.distance > bestDistance) {
+                                bestDistance = run.distance;
+                                bestRunId = childSnapshot.key;
+                            }
+                        });
+                        
+                        // Only update if this new run is better, otherwise delete other entries
+                        if (distance >= bestDistance) {
+                            // Delete all other runs with this name
+                            const deletions = [];
+                            snapshot.forEach((childSnapshot) => {
+                                if (childSnapshot.key !== currentRunId) {
+                                    deletions.push(database.ref('runs/' + childSnapshot.key).remove());
+                                }
+                            });
+                            await Promise.all(deletions);
+                            
+                            // Update current run
+                            await database.ref('runs/' + currentRunId).update(runData);
+                            return currentRunId;
+                        } else {
+                            // New run is worse - delete current run and keep the best
+                            await database.ref('runs/' + currentRunId).remove();
+                            return bestRunId;
+                        }
+                    }
+                }
+                
                 if (currentRunId) {
                     // Update existing run
                     await database.ref('runs/' + currentRunId).update(runData);
@@ -763,6 +811,11 @@
         }
         
         function openLogRunModal() {
+            // Prevent opening if already logged
+            if (runHasBeenLogged) {
+                return;
+            }
+            
             document.getElementById('log-distance').textContent = score;
             document.getElementById('log-collisions').textContent = collisions;
             document.getElementById('log-maxsize').textContent = currentMaxSize.toFixed(1);
@@ -804,7 +857,16 @@
             // Update the run in Firebase
             await saveRunToFirebase(score, collisions, currentMaxSize, playerName);
             
+            // Mark run as logged
+            runHasBeenLogged = true;
+            
             closeLogRunModal();
+            
+            // Update the game over screen to hide the log button
+            const logButton = document.querySelector('#gameover-screen button.secondary');
+            if (logButton) {
+                logButton.style.display = 'none';
+            }
             
             // Show success message or open leaderboard
             openLeaderboard();
@@ -937,6 +999,8 @@
             touchOffsetX = 0;
             snowTrail = [];
             currentMaxSize = 3;
+            currentRunId = null;
+            runHasBeenLogged = false;
             
             score = 0;
             collisions = 0;
