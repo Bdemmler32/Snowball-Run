@@ -25,6 +25,7 @@
         
         #game-container {
             text-align: center;
+            position: relative;
         }
         
         .menu-screen, .gameover-screen {
@@ -133,6 +134,11 @@
             max-width: 400px;
             margin-left: auto;
             margin-right: auto;
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
         }
         
         .hud-item {
@@ -457,6 +463,92 @@
             font-size: 1.1em;
             margin-bottom: 8px;
         }
+        
+        .pause-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 45px;
+            height: 45px;
+            font-size: 1.3em;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            pointer-events: auto;
+        }
+        
+        .pause-button:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        
+        .pause-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+        
+        .pause-menu {
+            background: white;
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            min-width: 300px;
+        }
+        
+        .pause-menu h2 {
+            color: #2563eb;
+            margin-bottom: 30px;
+            font-size: 3em;
+        }
+        
+        .pause-menu button {
+            margin: 8px;
+            font-size: 1.3em;
+            padding: 18px 40px;
+        }
+        
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 600;
+        }
+        
+        .countdown-number {
+            color: white;
+            font-size: 8em;
+            font-weight: bold;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            animation: countdownPulse 1s ease-out;
+        }
+        
+        @keyframes countdownPulse {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -503,7 +595,10 @@
             </div>
         </div>
         
-        <canvas id="game-canvas" class="hidden"></canvas>
+        <div class="canvas-wrapper">
+            <button id="pause-button" class="pause-button hidden">⏸</button>
+            <canvas id="game-canvas" class="hidden"></canvas>
+        </div>
         
         <div id="touch-slider" class="touch-slider hidden">
             <div class="slider-track"></div>
@@ -562,6 +657,19 @@
         </div>
     </div>
 
+    <!-- Pause Overlay -->
+    <div id="pause-overlay" class="pause-overlay hidden" onclick="resumeFromPause()">
+        <div class="pause-menu" onclick="event.stopPropagation()">
+            <h2>Paused</h2>
+            <button onclick="resumeFromPause()">Resume</button>
+        </div>
+    </div>
+    
+    <!-- Countdown Overlay -->
+    <div id="countdown-overlay" class="countdown-overlay hidden">
+        <div class="countdown-number" id="countdown-number">3</div>
+    </div>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -597,6 +705,7 @@
         let highScore = localStorage.getItem('snowballHighScore') || 0;
         let lastRunDistance = 0;
         let lastRunCollisions = 0;
+        let isPaused = false;
         
         // Separate touch position tracking (doesn't affect game speed at all)
         let currentTouchX = null;
@@ -608,12 +717,14 @@
         let game = {
             snowball: { x: 150, y: 100, size: 3, maxSize: 20 },
             obstacles: [],
+            snowFluffs: [],
             baseScrollSpeed: 8.4,
             scrollSpeed: 8.4,
             obstacleSpawnTimer: 0,
             distance: 0,
             animationId: null,
-            lastFrameTime: 0
+            lastFrameTime: 0,
+            lastSnowFluffDistance: 0
         };
         
         function resizeCanvas() {
@@ -628,6 +739,7 @@
             document.getElementById('game-hud').classList.add('hidden');
             document.getElementById('touch-slider').classList.add('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('pause-button').classList.add('hidden');
             
             if (screen === 'menu') {
                 document.getElementById('menu-screen').classList.remove('hidden');
@@ -645,6 +757,7 @@
                 document.getElementById('game-hud').classList.remove('hidden');
                 document.getElementById('game-canvas').classList.remove('hidden');
                 document.getElementById('touch-slider').classList.remove('hidden');
+                document.getElementById('pause-button').classList.remove('hidden');
             } else if (screen === 'gameover') {
                 document.getElementById('gameover-screen').classList.remove('hidden');
                 document.getElementById('final-score').textContent = score;
@@ -684,7 +797,7 @@
         
         // Allow touch anywhere on screen (not just canvas)
         document.addEventListener('touchstart', (e) => {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             
             const touchX = e.touches[0].clientX;
@@ -696,7 +809,7 @@
         }, { passive: false });
         
         document.addEventListener('touchmove', (e) => {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             
             if (currentTouchX === null) return;
@@ -715,13 +828,13 @@
         }, { passive: false });
         
         document.addEventListener('touchend', (e) => {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             currentTouchX = null;
         }, { passive: false });
         
         document.addEventListener('touchcancel', (e) => {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             currentTouchX = null;
         }, { passive: false });
@@ -981,18 +1094,78 @@
             document.getElementById('leaderboard-modal').classList.add('hidden');
         }
         
+        function pauseGame() {
+            if (gameState !== 'playing' || isPaused) return;
+            
+            isPaused = true;
+            document.getElementById('pause-overlay').classList.remove('hidden');
+        }
+        
+        // Add event listener for pause button to handle both click and touch
+        document.addEventListener('DOMContentLoaded', function() {
+            const pauseButton = document.getElementById('pause-button');
+            
+            pauseButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                pauseGame();
+            });
+            
+            pauseButton.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                pauseGame();
+            });
+        });
+        
+        function resumeFromPause() {
+            document.getElementById('pause-overlay').classList.add('hidden');
+            
+            // Show countdown
+            startCountdown();
+        }
+        
+        function startCountdown() {
+            const countdownOverlay = document.getElementById('countdown-overlay');
+            const countdownNumber = document.getElementById('countdown-number');
+            
+            countdownOverlay.classList.remove('hidden');
+            
+            let count = 3;
+            countdownNumber.textContent = count;
+            
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownNumber.textContent = count;
+                    // Retrigger animation
+                    countdownNumber.style.animation = 'none';
+                    setTimeout(() => {
+                        countdownNumber.style.animation = 'countdownPulse 1s ease-out';
+                    }, 10);
+                } else {
+                    clearInterval(countdownInterval);
+                    countdownOverlay.classList.add('hidden');
+                    isPaused = false;
+                    // Reset frame time to prevent time jump
+                    game.lastFrameTime = performance.now();
+                }
+            }, 1000);
+        }
+        
         function startGame() {
             resizeCanvas();
             
             game = {
                 snowball: { x: canvas.width / 2, y: 100, size: 3, maxSize: 20 },
                 obstacles: [],
+                snowFluffs: [],
                 baseScrollSpeed: 8.4,
                 scrollSpeed: 8.4,
                 obstacleSpawnTimer: 0,
                 distance: 0,
                 animationId: null,
-                lastFrameTime: performance.now()
+                lastFrameTime: performance.now(),
+                lastSnowFluffDistance: 0
             };
             
             currentTouchX = null;
@@ -1001,6 +1174,7 @@
             currentMaxSize = 3;
             currentRunId = null;
             runHasBeenLogged = false;
+            isPaused = false;
             
             score = 0;
             collisions = 0;
@@ -1012,7 +1186,7 @@
         
         // Touch event handlers - ONLY update position, never affect game state
         function handleTouchStart(e) {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             
             const rect = canvas.getBoundingClientRect();
@@ -1024,7 +1198,7 @@
         }
         
         function handleTouchMove(e) {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             
             if (currentTouchX === null) return;
@@ -1046,7 +1220,7 @@
         }
         
         function handleTouchEnd(e) {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             e.preventDefault();
             currentTouchX = null;
         }
@@ -1062,7 +1236,7 @@
         let mouseOffsetX = 0;
         
         canvas.addEventListener('mousedown', (e) => {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -1080,7 +1254,7 @@
         });
         
         canvas.addEventListener('mousemove', (e) => {
-            if (!mouseDown || gameState !== 'playing') return;
+            if (!mouseDown || gameState !== 'playing' || isPaused) return;
             
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -1106,6 +1280,31 @@
             });
         }
         
+        function spawnSnowFluff() {
+            // Only spawn if there are obstacles on screen to place it near
+            if (game.obstacles.length === 0) return;
+            
+            // Find a random obstacle to place the fluff near
+            const nearObstacle = game.obstacles[Math.floor(Math.random() * Math.min(3, game.obstacles.length))];
+            
+            // Position it near the obstacle horizontally (weaving to slightly dangerous distance)
+            const angleFromObstacle = (Math.random() - 0.5) * Math.PI; // -90 to +90 degrees (left or right)
+            const distanceFromObstacle = nearObstacle.size + 30 + Math.random() * 40; // 30-70 pixels away
+            
+            let fluffX = nearObstacle.x + Math.cos(angleFromObstacle) * distanceFromObstacle;
+            
+            // Keep it within canvas bounds with some margin
+            const margin = 20;
+            fluffX = Math.max(margin, Math.min(canvas.width - margin, fluffX));
+            
+            game.snowFluffs.push({
+                x: fluffX,
+                y: canvas.height + 50, // Spawn from bottom like obstacles
+                size: 12,
+                pulsePhase: Math.random() * Math.PI * 2
+            });
+        }
+        
         function checkCollision(snowball, obstacle) {
             const snowballRadius = snowball.size * 5;
             const dx = snowball.x - obstacle.x;
@@ -1113,6 +1312,15 @@
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             return distance < snowballRadius + obstacle.size;
+        }
+        
+        function checkSnowFluffCollision(snowball, fluff) {
+            const snowballRadius = snowball.size * 5;
+            const dx = snowball.x - fluff.x;
+            const dy = snowball.y - fluff.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            return distance < snowballRadius + fluff.size;
         }
         
         function drawSnowball(x, y, size) {
@@ -1284,11 +1492,64 @@
             }
         }
         
+        function drawSnowFluff(fluff) {
+            // Animate pulse effect
+            fluff.pulsePhase += 0.05;
+            const pulseScale = 1 + Math.sin(fluff.pulsePhase) * 0.15;
+            const currentSize = fluff.size * pulseScale;
+            
+            // Soft glow effect
+            const glowGradient = ctx.createRadialGradient(
+                fluff.x, fluff.y, 0,
+                fluff.x, fluff.y, currentSize * 1.5
+            );
+            glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            glowGradient.addColorStop(0.5, 'rgba(200, 230, 255, 0.2)');
+            glowGradient.addColorStop(1, 'rgba(200, 230, 255, 0)');
+            ctx.fillStyle = glowGradient;
+            ctx.beginPath();
+            ctx.arc(fluff.x, fluff.y, currentSize * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Main snow mound with gradient
+            const moundGradient = ctx.createRadialGradient(
+                fluff.x - currentSize * 0.3, fluff.y - currentSize * 0.3, currentSize * 0.1,
+                fluff.x, fluff.y, currentSize
+            );
+            moundGradient.addColorStop(0, '#FFFFFF');
+            moundGradient.addColorStop(0.6, '#F0F8FF');
+            moundGradient.addColorStop(1, '#E0EFF8');
+            ctx.fillStyle = moundGradient;
+            ctx.beginPath();
+            ctx.arc(fluff.x, fluff.y, currentSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Subtle outline
+            ctx.strokeStyle = 'rgba(200, 230, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Add sparkle points
+            const numSparkles = 4;
+            for (let i = 0; i < numSparkles; i++) {
+                const sparkleAngle = (Math.PI * 2 * i) / numSparkles + fluff.pulsePhase * 0.5;
+                const sparkleDistance = currentSize * 0.6;
+                const sparkleX = fluff.x + Math.cos(sparkleAngle) * sparkleDistance;
+                const sparkleY = fluff.y + Math.sin(sparkleAngle) * sparkleDistance;
+                const sparkleSize = 1.5 + Math.sin(fluff.pulsePhase * 2 + i) * 0.5;
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
         function gameLoop(currentTime) {
             // ALWAYS continue the loop, even if game is over (for smooth transition)
             game.animationId = requestAnimationFrame(gameLoop);
             
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || isPaused) return;
             
             // Calculate delta time for consistent speed across different frame rates
             const deltaTime = currentTime - game.lastFrameTime;
@@ -1368,6 +1629,37 @@
                 spawnObstacle();
                 game.obstacleSpawnTimer = 0;
             }
+            
+            // Spawn snow fluffs (rare power-ups) - approximately every 2500 distance
+            if (game.distance - game.lastSnowFluffDistance >= 2500 && game.obstacles.length > 0) {
+                spawnSnowFluff();
+                game.lastSnowFluffDistance = game.distance;
+            }
+            
+            // Update and draw snow fluffs BEFORE obstacles (so they appear behind)
+            game.snowFluffs = game.snowFluffs.filter(fluff => {
+                fluff.y -= actualSpeed;
+                
+                // Check collision with snowball
+                if (checkSnowFluffCollision(game.snowball, fluff)) {
+                    // Heal the snowball by 1 size (capped at maxSize)
+                    if (game.snowball.size < game.snowball.maxSize) {
+                        game.snowball.size = Math.min(game.snowball.maxSize, game.snowball.size + 1);
+                        // Track max size reached
+                        if (game.snowball.size > currentMaxSize) {
+                            currentMaxSize = game.snowball.size;
+                        }
+                    }
+                    // Remove the fluff after collection
+                    return false;
+                }
+                
+                // Draw the fluff
+                drawSnowFluff(fluff);
+                
+                // Keep on screen until scrolled past
+                return fluff.y > -50;
+            });
             
             // Update and draw obstacles
             game.obstacles = game.obstacles.filter(obstacle => {
