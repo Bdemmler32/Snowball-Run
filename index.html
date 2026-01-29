@@ -568,49 +568,170 @@
         
         function drawSnowball(x, y, size) {
             const radius = size * 5;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.strokeStyle = '#E0E0E0';
-            ctx.lineWidth = 2;
             
+            // Create gradient for 3D effect
+            const gradient = ctx.createRadialGradient(
+                x - radius * 0.3, y - radius * 0.3, radius * 0.1,
+                x, y, radius
+            );
+            gradient.addColorStop(0, '#FFFFFF');
+            gradient.addColorStop(0.5, '#F5F5F5');
+            gradient.addColorStop(1, '#E0E0E0');
+            
+            // Draw main snowball with gradient
+            ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, Math.PI * 2);
             ctx.fill();
+            
+            // Add subtle shadow/outline
+            ctx.strokeStyle = '#CCCCCC';
+            ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Add texture
-            ctx.fillStyle = '#F0F0F0';
-            for (let i = 0; i < 5; i++) {
-                const angle = (Math.PI * 2 * i) / 5 + game.distance * 0.01;
-                const dotX = x + Math.cos(angle) * radius * 0.6;
-                const dotY = y + Math.sin(angle) * radius * 0.6;
+            // Add highlight for shine
+            const highlight = ctx.createRadialGradient(
+                x - radius * 0.4, y - radius * 0.4, 0,
+                x - radius * 0.4, y - radius * 0.4, radius * 0.4
+            );
+            highlight.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = highlight;
+            ctx.beginPath();
+            ctx.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add texture with small snow clumps
+            ctx.fillStyle = 'rgba(240, 240, 240, 0.6)';
+            for (let i = 0; i < 8; i++) {
+                const angle = (Math.PI * 2 * i) / 8 + game.distance * 0.01;
+                const distance = radius * 0.5 + (Math.sin(angle * 3) * radius * 0.2);
+                const dotX = x + Math.cos(angle) * distance;
+                const dotY = y + Math.sin(angle) * distance;
+                const dotSize = 1 + Math.random() * 2;
                 ctx.beginPath();
-                ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+                ctx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
         
         function drawObstacle(obstacle) {
             if (obstacle.type === 'rock') {
-                ctx.fillStyle = '#8B7355';
+                // Draw shadow first
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.ellipse(obstacle.x + 2, obstacle.y + obstacle.size + 2, obstacle.size * 0.8, obstacle.size * 0.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Rock gradient
+                const rockGradient = ctx.createRadialGradient(
+                    obstacle.x - obstacle.size * 0.3, obstacle.y - obstacle.size * 0.3, obstacle.size * 0.1,
+                    obstacle.x, obstacle.y, obstacle.size
+                );
+                rockGradient.addColorStop(0, '#A89080');
+                rockGradient.addColorStop(0.5, '#8B7355');
+                rockGradient.addColorStop(1, '#6B5845');
+                
+                ctx.fillStyle = rockGradient;
                 ctx.strokeStyle = '#5C4A3A';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.arc(obstacle.x, obstacle.y, obstacle.size, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
+                
+                // Add some texture spots
+                ctx.fillStyle = 'rgba(90, 70, 50, 0.4)';
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i * Math.PI * 2) / 3;
+                    const spotX = obstacle.x + Math.cos(angle) * obstacle.size * 0.4;
+                    const spotY = obstacle.y + Math.sin(angle) * obstacle.size * 0.4;
+                    ctx.beginPath();
+                    ctx.arc(spotX, spotY, obstacle.size * 0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             } else if (obstacle.type === 'tree') {
-                ctx.fillStyle = '#654321';
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.ellipse(obstacle.x, obstacle.y + 15, obstacle.size * 0.6, obstacle.size * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Trunk with gradient
+                const trunkGradient = ctx.createLinearGradient(obstacle.x - 5, 0, obstacle.x + 5, 0);
+                trunkGradient.addColorStop(0, '#4A3621');
+                trunkGradient.addColorStop(0.5, '#654321');
+                trunkGradient.addColorStop(1, '#4A3621');
+                ctx.fillStyle = trunkGradient;
                 ctx.fillRect(obstacle.x - 5, obstacle.y - 10, 10, 20);
-                ctx.fillStyle = '#228B22';
+                
+                // Trunk outline
+                ctx.strokeStyle = '#3A2611';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(obstacle.x - 5, obstacle.y - 10, 10, 20);
+                
+                // Foliage with gradient
+                const foliageGradient = ctx.createRadialGradient(
+                    obstacle.x - obstacle.size * 0.2, obstacle.y - obstacle.size - obstacle.size * 0.2, obstacle.size * 0.1,
+                    obstacle.x, obstacle.y - obstacle.size, obstacle.size
+                );
+                foliageGradient.addColorStop(0, '#3FA34D');
+                foliageGradient.addColorStop(0.5, '#228B22');
+                foliageGradient.addColorStop(1, '#1B6B1B');
+                
+                ctx.fillStyle = foliageGradient;
                 ctx.beginPath();
                 ctx.arc(obstacle.x, obstacle.y - obstacle.size, obstacle.size, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Add some darker spots for depth
+                ctx.fillStyle = 'rgba(27, 107, 27, 0.5)';
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i * Math.PI * 2) / 4 + Math.PI / 4;
+                    const spotX = obstacle.x + Math.cos(angle) * obstacle.size * 0.5;
+                    const spotY = obstacle.y - obstacle.size + Math.sin(angle) * obstacle.size * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(spotX, spotY, obstacle.size * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             } else if (obstacle.type === 'log') {
-                ctx.fillStyle = '#8B4513';
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(obstacle.x - obstacle.size + 2, obstacle.y - 6, obstacle.size * 2, 16);
+                
+                // Log gradient
+                const logGradient = ctx.createLinearGradient(obstacle.x, obstacle.y - 8, obstacle.x, obstacle.y + 8);
+                logGradient.addColorStop(0, '#A0522D');
+                logGradient.addColorStop(0.5, '#8B4513');
+                logGradient.addColorStop(1, '#6B3410');
+                
+                ctx.fillStyle = logGradient;
+                ctx.fillRect(obstacle.x - obstacle.size, obstacle.y - 8, obstacle.size * 2, 16);
+                
+                // Log outline
                 ctx.strokeStyle = '#654321';
                 ctx.lineWidth = 2;
-                ctx.fillRect(obstacle.x - obstacle.size, obstacle.y - 8, obstacle.size * 2, 16);
                 ctx.strokeRect(obstacle.x - obstacle.size, obstacle.y - 8, obstacle.size * 2, 16);
+                
+                // Wood grain lines
+                ctx.strokeStyle = 'rgba(101, 67, 33, 0.5)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 3; i++) {
+                    const y = obstacle.y - 4 + i * 4;
+                    ctx.beginPath();
+                    ctx.moveTo(obstacle.x - obstacle.size, y);
+                    ctx.lineTo(obstacle.x + obstacle.size, y);
+                    ctx.stroke();
+                }
+                
+                // End caps
+                ctx.fillStyle = '#D2691E';
+                ctx.beginPath();
+                ctx.arc(obstacle.x - obstacle.size, obstacle.y, 8, Math.PI / 2, Math.PI * 1.5);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(obstacle.x + obstacle.size, obstacle.y, 8, -Math.PI / 2, Math.PI / 2);
+                ctx.fill();
             }
         }
         
@@ -627,14 +748,25 @@
             // Normalize to 60 FPS (deltaTime in ms, targeting 16.67ms per frame)
             const frameMultiplier = deltaTime / 16.67;
             
-            // Clear canvas
-            ctx.fillStyle = '#87CEEB';
+            // Clear canvas with gradient sky
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGradient.addColorStop(0, '#B8D8F0');
+            skyGradient.addColorStop(0.7, '#87CEEB');
+            skyGradient.addColorStop(1, '#E8F4F8');
+            ctx.fillStyle = skyGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw snow on ground
+            // Draw snow on ground with shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, canvas.height - 12, canvas.width, 2);
+            
             ctx.fillStyle = '#FFFFFF';
             for (let i = 0; i < canvas.width; i += 20) {
-                ctx.fillRect(i, canvas.height - 10, 15, 10);
+                // Add slight variation to snow mounds
+                const moundHeight = 10 + Math.sin(i * 0.5) * 2;
+                ctx.beginPath();
+                ctx.arc(i + 7.5, canvas.height - 5, 8, Math.PI, 0);
+                ctx.fill();
             }
             
             // Calculate scroll speed ONLY from snowball size
@@ -657,13 +789,24 @@
             // Update and draw snow trail
             snowTrail = snowTrail.filter(particle => {
                 particle.y -= actualSpeed * 0.3; // Trail moves up slower than obstacles
-                particle.life -= 0.02;
+                particle.life -= 0.015;
                 
                 if (particle.life > 0) {
-                    const alpha = particle.life * 0.5;
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    const alpha = particle.life * 0.6;
+                    const currentSize = particle.size * (0.5 + particle.life * 0.5);
+                    
+                    // Draw with gradient for softer look
+                    const trailGradient = ctx.createRadialGradient(
+                        particle.x, particle.y, 0,
+                        particle.x, particle.y, currentSize
+                    );
+                    trailGradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+                    trailGradient.addColorStop(0.5, `rgba(240, 248, 255, ${alpha * 0.6})`);
+                    trailGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+                    
+                    ctx.fillStyle = trailGradient;
                     ctx.beginPath();
-                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.arc(particle.x, particle.y, currentSize, 0, Math.PI * 2);
                     ctx.fill();
                     return true;
                 }
