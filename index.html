@@ -102,6 +102,14 @@
             transform: scale(0.98);
         }
         
+        button.secondary {
+            background: #10b981;
+        }
+        
+        button.secondary:hover {
+            background: #059669;
+        }
+        
         canvas {
             border: 4px solid #93c5fd;
             border-radius: 12px;
@@ -240,6 +248,215 @@
         .hidden {
             display: none !important;
         }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+            color: #2563eb;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: #f3f4f6;
+        }
+        
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .modal-footer {
+            padding: 24px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .modal-footer button {
+            padding: 12px 24px;
+            font-size: 1em;
+            margin: 0;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .stats-box {
+            background: #f3f4f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-box p {
+            margin: 8px 0;
+            font-size: 1.1em;
+        }
+        
+        .rank-badge {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .rank-badge.gold {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        }
+        
+        .rank-badge.silver {
+            background: linear-gradient(135deg, #d1d5db, #9ca3af);
+        }
+        
+        .rank-badge.bronze {
+            background: linear-gradient(135deg, #d97706, #b45309);
+        }
+        
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .leaderboard-table th {
+            background: #f3f4f6;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: bold;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .leaderboard-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .leaderboard-table tr:hover {
+            background: #f9fafb;
+        }
+        
+        .leaderboard-table .rank-col {
+            width: 50px;
+            text-align: center;
+            font-weight: bold;
+            color: #6b7280;
+        }
+        
+        .leaderboard-table .name-col {
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .leaderboard-table .distance-col,
+        .leaderboard-table .collisions-col {
+            text-align: right;
+            color: #6b7280;
+        }
+        
+        .leaderboard-table .highlight {
+            background: #dbeafe;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .empty-state p {
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -251,7 +468,7 @@
                 <h3>How to Play:</h3>
                 <ul>
                     <li>• Swipe or drag to move the snowball</li>
-                    <li>• Start at size 3, grow to max size 10</li>
+                    <li>• Start at size 3, grow to max size 20</li>
                     <li>• Each collision reduces size by 1</li>
                     <li>• Game over when size reaches 0</li>
                     <li>• Survive as long as possible!</li>
@@ -264,6 +481,7 @@
             </div>
             <p id="high-score-display" class="high-score hidden"></p>
             <button onclick="startGame()">Start New Run</button>
+            <button onclick="openLeaderboard()" class="secondary">🏆 Online Leaderboard</button>
         </div>
         
         <div id="game-hud" class="game-hud hidden">
@@ -273,7 +491,7 @@
             </div>
             <div class="hud-item">
                 <span class="hud-label">Size:</span>
-                <span class="hud-value" id="hud-size">3.0/10</span>
+                <span class="hud-value" id="hud-size">3.0/20</span>
             </div>
             <div class="hud-item">
                 <span class="hud-label">Collisions:</span>
@@ -301,10 +519,74 @@
                 <p id="current-high-score" class="hidden"></p>
             </div>
             <button onclick="startGame()">Start New Run</button>
+            <button onclick="openLogRunModal()" class="secondary">📝 Log Run to Leaderboard</button>
         </div>
     </div>
 
+    <!-- Log Run Modal -->
+    <div id="log-run-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>📝 Log Your Run</h2>
+                <button class="modal-close" onclick="closeLogRunModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-box">
+                    <p><strong>Distance:</strong> <span id="log-distance">0</span></p>
+                    <p><strong>Collisions:</strong> <span id="log-collisions">0</span></p>
+                    <p><strong>Max Size:</strong> <span id="log-maxsize">0</span></p>
+                    <p id="log-rank"></p>
+                </div>
+                <div class="form-group">
+                    <label for="player-name">Your Name (optional)</label>
+                    <input type="text" id="player-name" placeholder="Anonymous" maxlength="30">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeLogRunModal()" style="background: #6b7280;">Cancel</button>
+                <button onclick="saveRunToLeaderboard()">Save to Leaderboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🏆 Online Leaderboard</h2>
+                <button class="modal-close" onclick="closeLeaderboard()">×</button>
+            </div>
+            <div class="modal-body" id="leaderboard-body">
+                <div class="loading">Loading leaderboard...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
     <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB0qBapWj3VBCIkVm8jcNvDkT4jgZuBvSI",
+            authDomain: "snowball-run-4767d.firebaseapp.com",
+            projectId: "snowball-run-4767d",
+            storageBucket: "snowball-run-4767d.firebasestorage.app",
+            messagingSenderId: "409188975425",
+            appId: "1:409188975425:web:eb9950b0be43ae3e95d7c0",
+            measurementId: "G-5REM2H2QTM",
+            databaseURL: "https://snowball-run-4767d-default-rtdb.firebaseio.com"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // Current run ID for updating after game over
+        let currentRunId = null;
+        let currentMaxSize = 3;
+        
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         
@@ -323,7 +605,7 @@
         let snowTrail = [];
         
         let game = {
-            snowball: { x: 150, y: 100, size: 3, maxSize: 10 },
+            snowball: { x: 150, y: 100, size: 3, maxSize: 20 },
             obstacles: [],
             baseScrollSpeed: 8.4,
             scrollSpeed: 8.4,
@@ -435,11 +717,213 @@
             currentTouchX = null;
         }, { passive: false });
         
+        async function saveRunToFirebase(distance, collisions, maxSize, name = "Anonymous") {
+            try {
+                const runData = {
+                    name: name,
+                    distance: distance,
+                    collisions: collisions,
+                    maxSize: maxSize,
+                    timestamp: Date.now()
+                };
+                
+                if (currentRunId) {
+                    // Update existing run
+                    await database.ref('runs/' + currentRunId).update(runData);
+                    return currentRunId;
+                } else {
+                    // Create new run
+                    const newRunRef = await database.ref('runs').push(runData);
+                    return newRunRef.key;
+                }
+            } catch (error) {
+                console.error("Error saving run:", error);
+                return null;
+            }
+        }
+        
+        async function getRankForDistance(distance) {
+            try {
+                const snapshot = await database.ref('runs').orderByChild('distance').once('value');
+                const runs = [];
+                snapshot.forEach((childSnapshot) => {
+                    runs.push(childSnapshot.val());
+                });
+                
+                // Sort by distance descending
+                runs.sort((a, b) => b.distance - a.distance);
+                
+                // Find rank
+                const rank = runs.findIndex(run => run.distance <= distance) + 1;
+                return rank || runs.length + 1;
+            } catch (error) {
+                console.error("Error getting rank:", error);
+                return null;
+            }
+        }
+        
+        function openLogRunModal() {
+            document.getElementById('log-distance').textContent = score;
+            document.getElementById('log-collisions').textContent = collisions;
+            document.getElementById('log-maxsize').textContent = currentMaxSize.toFixed(1);
+            
+            // Load saved name if exists
+            const savedName = localStorage.getItem('playerName');
+            if (savedName) {
+                document.getElementById('player-name').value = savedName;
+            }
+            
+            // Get and display rank
+            getRankForDistance(score).then(rank => {
+                if (rank !== null) {
+                    let rankBadgeClass = '';
+                    if (rank === 1) rankBadgeClass = 'gold';
+                    else if (rank === 2) rankBadgeClass = 'silver';
+                    else if (rank === 3) rankBadgeClass = 'bronze';
+                    
+                    document.getElementById('log-rank').innerHTML = 
+                        `<strong>Current Rank:</strong> <span class="rank-badge ${rankBadgeClass}">#${rank}</span>`;
+                }
+            });
+            
+            document.getElementById('log-run-modal').classList.remove('hidden');
+        }
+        
+        function closeLogRunModal() {
+            document.getElementById('log-run-modal').classList.add('hidden');
+        }
+        
+        async function saveRunToLeaderboard() {
+            const playerName = document.getElementById('player-name').value.trim() || "Anonymous";
+            
+            // Save name to localStorage for next time
+            if (playerName !== "Anonymous") {
+                localStorage.setItem('playerName', playerName);
+            }
+            
+            // Update the run in Firebase
+            await saveRunToFirebase(score, collisions, currentMaxSize, playerName);
+            
+            closeLogRunModal();
+            
+            // Show success message or open leaderboard
+            openLeaderboard();
+        }
+        
+        async function openLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+            document.getElementById('leaderboard-body').innerHTML = '<div class="loading">Loading leaderboard...</div>';
+            
+            try {
+                const snapshot = await database.ref('runs').orderByChild('distance').limitToLast(20).once('value');
+                const runs = [];
+                
+                snapshot.forEach((childSnapshot) => {
+                    runs.push({
+                        id: childSnapshot.key,
+                        ...childSnapshot.val()
+                    });
+                });
+                
+                // Sort by distance descending (since limitToLast gives us ascending)
+                runs.sort((a, b) => b.distance - a.distance);
+                
+                if (runs.length === 0) {
+                    document.getElementById('leaderboard-body').innerHTML = `
+                        <div class="empty-state">
+                            <p>No runs yet!</p>
+                            <p style="font-size: 0.9em;">Be the first to set a record!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let tableHTML = `
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th class="rank-col">Rank</th>
+                                <th class="name-col">Name</th>
+                                <th class="distance-col">Distance</th>
+                                <th class="collisions-col">Hits</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                runs.forEach((run, index) => {
+                    const rank = index + 1;
+                    let rankDisplay = `#${rank}`;
+                    
+                    if (rank === 1) rankDisplay = '🥇';
+                    else if (rank === 2) rankDisplay = '🥈';
+                    else if (rank === 3) rankDisplay = '🥉';
+                    
+                    const isCurrentRun = run.id === currentRunId;
+                    const highlightClass = isCurrentRun ? 'highlight' : '';
+                    
+                    tableHTML += `
+                        <tr class="${highlightClass}">
+                            <td class="rank-col">${rankDisplay}</td>
+                            <td class="name-col">${run.name}</td>
+                            <td class="distance-col">${run.distance}</td>
+                            <td class="collisions-col">${run.collisions}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableHTML += `
+                        </tbody>
+                    </table>
+                `;
+                
+                // If current run is not in top 20, show their rank
+                if (currentRunId) {
+                    const currentRunInTop20 = runs.some(run => run.id === currentRunId);
+                    if (!currentRunInTop20) {
+                        const allSnapshot = await database.ref('runs').orderByChild('distance').once('value');
+                        const allRuns = [];
+                        allSnapshot.forEach((childSnapshot) => {
+                            allRuns.push({
+                                id: childSnapshot.key,
+                                ...childSnapshot.val()
+                            });
+                        });
+                        allRuns.sort((a, b) => b.distance - a.distance);
+                        const rank = allRuns.findIndex(run => run.id === currentRunId) + 1;
+                        
+                        if (rank > 0) {
+                            tableHTML += `
+                                <div style="margin-top: 20px; padding: 16px; background: #dbeafe; border-radius: 8px; text-align: center;">
+                                    <strong>Your Rank: #${rank}</strong>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+                
+                document.getElementById('leaderboard-body').innerHTML = tableHTML;
+                
+            } catch (error) {
+                console.error("Error loading leaderboard:", error);
+                document.getElementById('leaderboard-body').innerHTML = `
+                    <div class="empty-state">
+                        <p>Error loading leaderboard</p>
+                        <p style="font-size: 0.9em;">Please try again later</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function closeLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.add('hidden');
+        }
+        
         function startGame() {
             resizeCanvas();
             
             game = {
-                snowball: { x: canvas.width / 2, y: 100, size: 3, maxSize: 10 },
+                snowball: { x: canvas.width / 2, y: 100, size: 3, maxSize: 20 },
                 obstacles: [],
                 baseScrollSpeed: 8.4,
                 scrollSpeed: 8.4,
@@ -452,6 +936,7 @@
             currentTouchX = null;
             touchOffsetX = 0;
             snowTrail = [];
+            currentMaxSize = 3;
             
             score = 0;
             collisions = 0;
@@ -644,8 +1129,8 @@
                 ctx.fillStyle = 'rgba(90, 70, 50, 0.4)';
                 for (let i = 0; i < 3; i++) {
                     const angle = (i * Math.PI * 2) / 3;
-                    const spotX = obstacle.x + Math.cos(angle) * obstacle.size * 0.4;
-                    const spotY = obstacle.y + Math.sin(angle) * obstacle.size * 0.4;
+                    const spotX = obstacle.x + Math.cos(angle) * obstacle.size * 0.5;
+                    const spotY = obstacle.y + Math.sin(angle) * obstacle.size * 0.5;
                     ctx.beginPath();
                     ctx.arc(spotX, spotY, obstacle.size * 0.15, 0, Math.PI * 2);
                     ctx.fill();
@@ -839,6 +1324,12 @@
                             highScore = score;
                             localStorage.setItem('snowballHighScore', highScore);
                         }
+                        
+                        // Auto-save run to Firebase
+                        saveRunToFirebase(score, collisions, currentMaxSize).then(runId => {
+                            currentRunId = runId;
+                        });
+                        
                         showScreen('gameover');
                         return false;
                     }
@@ -858,6 +1349,10 @@
             if (Math.floor(game.distance) % 200 === 0 && game.distance > 0) {
                 if (game.snowball.size < game.snowball.maxSize) {
                     game.snowball.size = Math.min(game.snowball.maxSize, game.snowball.size + 0.1);
+                    // Track max size reached
+                    if (game.snowball.size > currentMaxSize) {
+                        currentMaxSize = game.snowball.size;
+                    }
                 }
             }
             
