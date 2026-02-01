@@ -669,6 +669,7 @@
             </div>
             <button onclick="startGame()">Start New Run</button>
             <button onclick="openLogRunModal()" class="secondary">📝 Log Run to Leaderboard</button>
+            <button onclick="returnToMenu()" class="secondary">🏠 Main Menu</button>
         </div>
     </div>
 
@@ -1200,6 +1201,11 @@
                     game.lastFrameTime = performance.now();
                 }
             }, 1000);
+        }
+        
+        function returnToMenu() {
+            gameState = 'menu';
+            showScreen('menu');
         }
         
         function startGame() {
