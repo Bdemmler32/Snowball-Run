@@ -772,13 +772,16 @@
             snowball: { x: 150, y: 100, size: 3, maxSize: 20 },
             obstacles: [],
             snowFluffs: [],
+            yetis: [],
             baseScrollSpeed: 8.4,
             scrollSpeed: 8.4,
             obstacleSpawnTimer: 0,
             distance: 0,
             animationId: null,
             lastFrameTime: 0,
-            lastSnowFluffDistance: 0
+            lastSnowFluffDistance: 0,
+            lastYetiDistance: 0,
+            yetiSpawnIncrement: 5000
         };
         
         function resizeCanvas() {
@@ -1206,13 +1209,16 @@
                 snowball: { x: canvas.width / 2, y: 100, size: 3, maxSize: 20 },
                 obstacles: [],
                 snowFluffs: [],
+                yetis: [],
                 baseScrollSpeed: 8.4,
                 scrollSpeed: 8.4,
                 obstacleSpawnTimer: 0,
                 distance: 0,
                 animationId: null,
                 lastFrameTime: performance.now(),
-                lastSnowFluffDistance: 0
+                lastSnowFluffDistance: 0,
+                lastYetiDistance: 0,
+                yetiSpawnIncrement: 5000
             };
             
             currentTouchX = null;
@@ -1353,6 +1359,30 @@
                 size: 12,
                 pulsePhase: Math.random() * Math.PI * 2
             });
+        }
+        
+        function spawnYeti() {
+            // Random entry side (left or right)
+            const fromLeft = Math.random() < 0.5;
+            
+            // Spawn position - off screen on chosen side
+            const startX = fromLeft ? -100 : canvas.width + 100;
+            const startY = canvas.height + 50; // Spawn from bottom like obstacles
+            
+            game.yetis.push({
+                x: startX,
+                y: startY,
+                width: 80,
+                height: 100,
+                speed: 5, // Horizontal speed (slightly faster than it looks due to scroll)
+                direction: fromLeft ? 1 : -1, // 1 for right, -1 for left
+                legPhase: 0,
+                armPhase: 0,
+                type: 'yeti'
+            });
+            
+            // Increase spawn increment for next yeti
+            game.yetiSpawnIncrement += 1000;
         }
         
         function checkCollision(snowball, obstacle) {
@@ -1614,6 +1644,177 @@
             }
         }
         
+        function drawYeti(yeti) {
+            ctx.save();
+            ctx.translate(yeti.x, yeti.y);
+            
+            // Mirror for right-to-left direction
+            if (yeti.direction === -1) {
+                ctx.scale(-1, 1);
+            }
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(0, 90, 35, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Legs (animated running)
+            const legSwing = Math.sin(yeti.legPhase) * 15;
+            
+            // Left leg
+            ctx.fillStyle = '#f0f9ff';
+            ctx.beginPath();
+            ctx.ellipse(-15 + legSwing, 60, 12, 30, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Right leg
+            ctx.beginPath();
+            ctx.ellipse(15 - legSwing, 60, 12, 30, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Feet
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.ellipse(-15 + legSwing, 85, 18, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(15 - legSwing, 85, 18, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Body (large furry oval)
+            const bodyGradient = ctx.createRadialGradient(-10, 20, 10, 0, 30, 50);
+            bodyGradient.addColorStop(0, '#ffffff');
+            bodyGradient.addColorStop(0.7, '#e0f2fe');
+            bodyGradient.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = bodyGradient;
+            ctx.beginPath();
+            ctx.ellipse(0, 30, 35, 45, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Fur texture
+            ctx.strokeStyle = 'rgba(191, 219, 254, 0.5)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 8; i++) {
+                const angle = (Math.PI * 2 * i) / 8;
+                const x1 = Math.cos(angle) * 20;
+                const y1 = 30 + Math.sin(angle) * 30;
+                const x2 = Math.cos(angle) * 35;
+                const y2 = 30 + Math.sin(angle) * 45;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            
+            // Arms (animated swinging)
+            const armSwing = Math.sin(yeti.armPhase) * 20;
+            
+            // Left arm
+            ctx.fillStyle = '#e0f2fe';
+            ctx.beginPath();
+            ctx.ellipse(-30, 25 + armSwing, 10, 25, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Right arm
+            ctx.beginPath();
+            ctx.ellipse(30, 25 - armSwing, 10, 25, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Hands/claws
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.arc(-35, 45 + armSwing, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(35, 45 - armSwing, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Head
+            const headGradient = ctx.createRadialGradient(-5, -5, 10, 0, 0, 25);
+            headGradient.addColorStop(0, '#ffffff');
+            headGradient.addColorStop(0.8, '#e0f2fe');
+            headGradient.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = headGradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Ears
+            ctx.fillStyle = '#e0f2fe';
+            ctx.beginPath();
+            ctx.arc(-18, -10, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(18, -10, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Face - Eyes (fierce)
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.arc(-10, -5, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(10, -5, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Angry eyebrows
+            ctx.strokeStyle = '#991b1b';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-15, -10);
+            ctx.lineTo(-5, -8);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(15, -10);
+            ctx.lineTo(5, -8);
+            ctx.stroke();
+            
+            // Nose
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.arc(0, 2, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Mouth (roaring)
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 5, 10, 0.2, Math.PI - 0.2);
+            ctx.stroke();
+            
+            // Teeth
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 5; i++) {
+                const tx = -8 + (i * 4);
+                ctx.beginPath();
+                ctx.moveTo(tx, 8);
+                ctx.lineTo(tx - 2, 12);
+                ctx.lineTo(tx + 2, 12);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+        
         function gameLoop(currentTime) {
             // ALWAYS continue the loop, even if game is over (for smooth transition)
             game.animationId = requestAnimationFrame(gameLoop);
@@ -1704,6 +1905,56 @@
                 spawnSnowFluff();
                 game.lastSnowFluffDistance = game.distance;
             }
+            
+            // Spawn yetis (very rare, deadly) - starts at 5000, then increases by 6000, 7000, 8000, etc.
+            if (game.distance - game.lastYetiDistance >= game.yetiSpawnIncrement) {
+                spawnYeti();
+                game.lastYetiDistance = game.distance;
+            }
+            
+            // Update and draw yetis (they scroll with obstacles but also move horizontally)
+            game.yetis = game.yetis.filter(yeti => {
+                // Scroll down with game
+                yeti.y -= actualSpeed;
+                
+                // Move horizontally
+                yeti.x += yeti.speed * yeti.direction;
+                
+                // Update animation
+                yeti.legPhase += 0.3;
+                yeti.armPhase += 0.25;
+                
+                // Check collision with snowball - INSTANT DEATH
+                const dx = game.snowball.x - yeti.x;
+                const dy = game.snowball.y - yeti.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const snowballRadius = game.snowball.size * 5;
+                
+                if (distance < snowballRadius + 40) { // Yeti collision radius
+                    // INSTANT DEATH - set size to 0
+                    game.snowball.size = 0;
+                    gameState = 'gameover';
+                    score = Math.floor(game.distance);
+                    lastRunDistance = score;
+                    lastRunCollisions = collisions;
+                    
+                    if (score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('snowballHighScore', highScore);
+                    }
+                    
+                    showScreen('gameover');
+                    return false;
+                }
+                
+                // Draw the yeti
+                drawYeti(yeti);
+                
+                // Keep on screen until scrolled past or ran off screen horizontally
+                const onScreenVertically = yeti.y > -150;
+                const onScreenHorizontally = yeti.x > -150 && yeti.x < canvas.width + 150;
+                return onScreenVertically && onScreenHorizontally;
+            });
             
             // Update and draw snow fluffs BEFORE obstacles (so they appear behind)
             game.snowFluffs = game.snowFluffs.filter(fluff => {
