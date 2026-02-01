@@ -18,22 +18,26 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
-            overflow: hidden;
+            justify-content: flex-start;
+            padding: 10px;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
         
         #game-container {
             text-align: center;
             position: relative;
+            width: 100%;
+            max-width: 450px;
+            margin: auto;
         }
         
         .menu-screen, .gameover-screen {
             background: white;
             border-radius: 16px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            padding: 40px;
-            max-width: 400px;
+            padding: 30px 20px;
+            max-width: 100%;
             animation: fadeIn 0.3s ease;
         }
         
@@ -44,13 +48,13 @@
         
         h1 {
             color: #2563eb;
-            font-size: 2.5em;
+            font-size: clamp(1.8em, 5vw, 2.5em);
             margin-bottom: 16px;
         }
         
         h2 {
             color: #dc2626;
-            font-size: 2em;
+            font-size: clamp(1.5em, 4vw, 2em);
             margin-bottom: 16px;
         }
         
@@ -58,6 +62,7 @@
             color: #374151;
             margin-bottom: 16px;
             line-height: 1.6;
+            font-size: clamp(0.9em, 3vw, 1em);
         }
         
         .instructions {
@@ -549,6 +554,54 @@
             50% { transform: scale(1.2); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
+        
+        /* Responsive Design - Ensure everything fits on screen */
+        @media (max-height: 700px) {
+            body {
+                padding: 5px;
+            }
+            .menu-screen, .gameover-screen {
+                padding: 20px 15px;
+            }
+            h1 {
+                font-size: 1.8em;
+                margin-bottom: 10px;
+            }
+            h2 {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+            button {
+                padding: 10px 20px;
+                font-size: 0.9em;
+                margin: 5px;
+            }
+            .instructions {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            body {
+                padding: 5px;
+            }
+            .menu-screen, .gameover-screen {
+                padding: 20px 15px;
+            }
+            button {
+                padding: 10px 15px;
+                font-size: 0.9em;
+            }
+        }
+        
+        /* Ensure game container doesn't overflow */
+        @media (max-height: 600px) {
+            #game-container {
+                transform: scale(0.9);
+                transform-origin: top center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -850,12 +903,12 @@
                     timestamp: Date.now()
                 };
                 
-                // If updating with a real name (not Anonymous), check if this name already exists
+                // If saving with a real name (not Anonymous), check for duplicate names
                 if (name !== "Anonymous") {
                     const snapshot = await database.ref('runs').orderByChild('name').equalTo(name).once('value');
                     
                     if (snapshot.exists()) {
-                        // Name exists - find the best run to update
+                        // Name exists - keep only the best run
                         let bestRunId = null;
                         let bestDistance = -1;
                         
@@ -867,37 +920,29 @@
                             }
                         });
                         
-                        // Only update if this new run is better, otherwise delete other entries
-                        if (distance >= bestDistance) {
-                            // Delete all other runs with this name
+                        // If this new run is better than existing best
+                        if (distance > bestDistance) {
+                            // Delete all existing runs with this name
                             const deletions = [];
                             snapshot.forEach((childSnapshot) => {
-                                if (childSnapshot.key !== currentRunId) {
-                                    deletions.push(database.ref('runs/' + childSnapshot.key).remove());
-                                }
+                                deletions.push(database.ref('runs/' + childSnapshot.key).remove());
                             });
                             await Promise.all(deletions);
                             
-                            // Update current run
-                            await database.ref('runs/' + currentRunId).update(runData);
-                            return currentRunId;
+                            // Create new run with better score
+                            const newRunRef = await database.ref('runs').push(runData);
+                            return newRunRef.key;
                         } else {
-                            // New run is worse - delete current run and keep the best
-                            await database.ref('runs/' + currentRunId).remove();
+                            // This run is worse - don't save it, return existing best
                             return bestRunId;
                         }
                     }
                 }
                 
-                if (currentRunId) {
-                    // Update existing run
-                    await database.ref('runs/' + currentRunId).update(runData);
-                    return currentRunId;
-                } else {
-                    // Create new run
-                    const newRunRef = await database.ref('runs').push(runData);
-                    return newRunRef.key;
-                }
+                // No existing name or Anonymous - create new run
+                const newRunRef = await database.ref('runs').push(runData);
+                return newRunRef.key;
+                
             } catch (error) {
                 console.error("Error saving run:", error);
                 return null;
@@ -1233,29 +1278,32 @@
         canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
         canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
         
-        // Mouse controls
+        // Mouse controls - DOCUMENT LEVEL so they work even when leaving canvas
         let mouseDown = false;
         let mouseOffsetX = 0;
         
-        canvas.addEventListener('mousedown', (e) => {
+        document.addEventListener('mousedown', (e) => {
             if (gameState !== 'playing' || isPaused) return;
             
+            // Check if click is near the canvas area
             const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
             
-            mouseOffsetX = game.snowball.x - mouseX;
-            mouseDown = true;
+            // Only activate if clicking within reasonable area of game
+            if (mouseX >= rect.left - 50 && mouseX <= rect.right + 50 &&
+                mouseY >= rect.top - 50 && mouseY <= rect.bottom + 50) {
+                const canvasX = mouseX - rect.left;
+                mouseOffsetX = game.snowball.x - canvasX;
+                mouseDown = true;
+            }
         });
         
-        canvas.addEventListener('mouseup', () => {
+        document.addEventListener('mouseup', () => {
             mouseDown = false;
         });
         
-        canvas.addEventListener('mouseleave', () => {
-            mouseDown = false;
-        });
-        
-        canvas.addEventListener('mousemove', (e) => {
+        document.addEventListener('mousemove', (e) => {
             if (!mouseDown || gameState !== 'playing' || isPaused) return;
             
             const rect = canvas.getBoundingClientRect();
