@@ -926,6 +926,19 @@
                 .sort((a, b) => Number(b.distance) - Number(a.distance));
         }
 
+        function mergeRunIntoLeaderboard(runs, newRun) {
+            const bestByName = {};
+
+            [...(Array.isArray(runs) ? runs : []), newRun].forEach(run => {
+                const key = String(run.name || "Anonymous").trim().toLowerCase() || "anonymous";
+                if (!bestByName[key] || Number(run.distance) > Number(bestByName[key].distance)) {
+                    bestByName[key] = run;
+                }
+            });
+
+            return sortRuns(Object.values(bestByName)).slice(0, 10);
+        }
+
         async function fetchLeaderboardFromApi() {
             const response = await fetch(`${LEADERBOARD_API_URL}?action=leaderboard&cacheBust=${Date.now()}`);
             const result = await response.json();
@@ -939,12 +952,12 @@
             return runs;
         }
 
-        function refreshLeaderboardInBackground({ updateVisibleModal = false } = {}) {
-            if (leaderboardRefreshPromise) {
+        function refreshLeaderboardInBackground({ updateVisibleModal = false, force = false } = {}) {
+            if (leaderboardRefreshPromise && !force) {
                 return leaderboardRefreshPromise;
             }
 
-            leaderboardRefreshPromise = fetchLeaderboardFromApi()
+            const refreshPromise = fetchLeaderboardFromApi()
                 .then(runs => {
                     if (updateVisibleModal && !document.getElementById('leaderboard-modal').classList.contains('hidden')) {
                         renderLeaderboard(runs, "Updated just now");
@@ -956,10 +969,13 @@
                     return null;
                 })
                 .finally(() => {
-                    leaderboardRefreshPromise = null;
+                    if (leaderboardRefreshPromise === refreshPromise) {
+                        leaderboardRefreshPromise = null;
+                    }
                 });
 
-            return leaderboardRefreshPromise;
+            leaderboardRefreshPromise = refreshPromise;
+            return refreshPromise;
         }
 
         function renderLeaderboard(runs, statusText = "") {
@@ -1124,7 +1140,7 @@
 
             const cached = getCachedLeaderboard();
             const cachedRuns = cached && Array.isArray(cached.runs) ? cached.runs : [];
-            const optimisticRuns = sortRuns([...cachedRuns, optimisticRun]).slice(0, 10);
+            const optimisticRuns = mergeRunIntoLeaderboard(cachedRuns, optimisticRun);
             setCachedLeaderboard(optimisticRuns);
             
             closeLogRunModal();
@@ -1142,7 +1158,18 @@
             saveRunToLeaderboardApi(score, collisions, currentMaxSize, playerName)
                 .then(result => {
                     currentRunId = result.id || currentRunId;
-                    return refreshLeaderboardInBackground({ updateVisibleModal: true });
+
+                    // The Apps Script save response includes the newly rebuilt leaderboard.
+                    // Use that immediately so the modal/local cache does not show the old score.
+                    if (result.runs && Array.isArray(result.runs)) {
+                        const confirmedRuns = sortRuns(result.runs);
+                        setCachedLeaderboard(confirmedRuns);
+                        renderLeaderboard(confirmedRuns, "Saved just now");
+                        return confirmedRuns;
+                    }
+
+                    // Fallback: force a new refresh instead of reusing an older in-flight request.
+                    return refreshLeaderboardInBackground({ updateVisibleModal: true, force: true });
                 })
                 .catch(error => {
                     console.error("Error saving run:", error);
