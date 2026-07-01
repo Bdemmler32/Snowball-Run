@@ -725,27 +725,20 @@
         <div class="countdown-number" id="countdown-number">3</div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
     <script>
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyB0qBapWj3VBCIkVm8jcNvDkT4jgZuBvSI",
-            authDomain: "snowball-run-4767d.firebaseapp.com",
-            projectId: "snowball-run-4767d",
-            storageBucket: "snowball-run-4767d.firebasestorage.app",
-            messagingSenderId: "409188975425",
-            appId: "1:409188975425:web:eb9950b0be43ae3e95d7c0",
-            measurementId: "G-5REM2H2QTM",
-            databaseURL: "https://snowball-run-4767d-default-rtdb.firebaseio.com"
-        };
+        // Google Apps Script Leaderboard API
+        // This replaces Firebase. The Apps Script web app writes to and reads from Google Sheets.
+        const LEADERBOARD_API_URL = "https://script.google.com/macros/s/AKfycbxWxjiZ2n2Qm1qj10jnrC5EA-x00r4_DEa9af6OPS3gOVWYU28tQETwToaBWCymcNvM/exec";
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        
+        function escapeHTML(value) {
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         // Current run ID for updating after game over
         let currentRunId = null;
         let currentMaxSize = 3;
@@ -897,75 +890,47 @@
             currentTouchX = null;
         }, { passive: false });
         
-        async function saveRunToFirebase(distance, collisions, maxSize, name = "Anonymous") {
+        async function saveRunToLeaderboardApi(distance, collisions, maxSize, name = "Anonymous") {
             try {
-                const runData = {
-                    name: name,
-                    distance: distance,
-                    collisions: collisions,
-                    maxSize: maxSize,
-                    timestamp: Date.now()
-                };
-                
-                // If saving with a real name (not Anonymous), check for duplicate names
-                if (name !== "Anonymous") {
-                    const snapshot = await database.ref('runs').orderByChild('name').equalTo(name).once('value');
-                    
-                    if (snapshot.exists()) {
-                        // Name exists - keep only the best run
-                        let bestRunId = null;
-                        let bestDistance = -1;
-                        
-                        snapshot.forEach((childSnapshot) => {
-                            const run = childSnapshot.val();
-                            if (run.distance > bestDistance) {
-                                bestDistance = run.distance;
-                                bestRunId = childSnapshot.key;
-                            }
-                        });
-                        
-                        // If this new run is better than existing best
-                        if (distance > bestDistance) {
-                            // Delete all existing runs with this name
-                            const deletions = [];
-                            snapshot.forEach((childSnapshot) => {
-                                deletions.push(database.ref('runs/' + childSnapshot.key).remove());
-                            });
-                            await Promise.all(deletions);
-                            
-                            // Create new run with better score
-                            const newRunRef = await database.ref('runs').push(runData);
-                            return newRunRef.key;
-                        } else {
-                            // This run is worse - don't save it, return existing best
-                            return bestRunId;
-                        }
-                    }
+                const response = await fetch(LEADERBOARD_API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        action: "save",
+                        name: name,
+                        distance: distance,
+                        collisions: collisions,
+                        maxSize: maxSize
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || "Leaderboard save failed");
                 }
-                
-                // No existing name or Anonymous - create new run
-                const newRunRef = await database.ref('runs').push(runData);
-                return newRunRef.key;
-                
+
+                return result.id || null;
             } catch (error) {
                 console.error("Error saving run:", error);
+                alert("Sorry, your run could not be saved to the online leaderboard. Please try again.");
                 return null;
             }
         }
         
         async function getRankForDistance(distance) {
             try {
-                const snapshot = await database.ref('runs').orderByChild('distance').once('value');
-                const runs = [];
-                snapshot.forEach((childSnapshot) => {
-                    runs.push(childSnapshot.val());
-                });
-                
-                // Sort by distance descending
-                runs.sort((a, b) => b.distance - a.distance);
-                
-                // Find rank
-                const rank = runs.findIndex(run => run.distance <= distance) + 1;
+                const response = await fetch(`${LEADERBOARD_API_URL}?action=leaderboard`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || "Leaderboard load failed");
+                }
+
+                const runs = Array.isArray(result.runs) ? result.runs : [];
+                const rank = runs.findIndex(run => Number(run.distance) <= distance) + 1;
+
+                // The current Apps Script returns the top 10 leaderboard.
+                // If this score is below the visible top 10, show the next possible rank.
                 return rank || runs.length + 1;
             } catch (error) {
                 console.error("Error getting rank:", error);
@@ -1017,8 +982,8 @@
                 localStorage.setItem('playerName', playerName);
             }
             
-            // Save the run to Firebase (creates new run or updates existing name entry)
-            const runId = await saveRunToFirebase(score, collisions, currentMaxSize, playerName);
+            // Save the run to the Google Sheets leaderboard
+            const runId = await saveRunToLeaderboardApi(score, collisions, currentMaxSize, playerName);
             currentRunId = runId;
             
             // Mark run as logged
@@ -1041,18 +1006,15 @@
             document.getElementById('leaderboard-body').innerHTML = '<div class="loading">Loading leaderboard...</div>';
             
             try {
-                const snapshot = await database.ref('runs').orderByChild('distance').limitToLast(10).once('value');
-                const runs = [];
-                
-                snapshot.forEach((childSnapshot) => {
-                    runs.push({
-                        id: childSnapshot.key,
-                        ...childSnapshot.val()
-                    });
-                });
-                
-                // Sort by distance descending (since limitToLast gives us ascending)
-                runs.sort((a, b) => b.distance - a.distance);
+                const response = await fetch(`${LEADERBOARD_API_URL}?action=leaderboard`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || "Leaderboard load failed");
+                }
+
+                const runs = Array.isArray(result.runs) ? result.runs : [];
+                runs.sort((a, b) => Number(b.distance) - Number(a.distance));
                 
                 if (runs.length === 0) {
                     document.getElementById('leaderboard-body').innerHTML = `
@@ -1085,15 +1047,15 @@
                     else if (rank === 2) rankDisplay = '🥈';
                     else if (rank === 3) rankDisplay = '🥉';
                     
-                    const isCurrentRun = run.id === currentRunId;
+                    const isCurrentRun = currentRunId && run.id === currentRunId;
                     const highlightClass = isCurrentRun ? 'highlight' : '';
                     
                     tableHTML += `
                         <tr class="${highlightClass}">
                             <td class="rank-col">${rankDisplay}</td>
-                            <td class="name-col">${run.name}</td>
-                            <td class="distance-col">${run.distance}</td>
-                            <td class="collisions-col">${run.collisions}</td>
+                            <td class="name-col">${escapeHTML(run.name || "Anonymous")}</td>
+                            <td class="distance-col">${Number(run.distance) || 0}</td>
+                            <td class="collisions-col">${Number(run.collisions) || 0}</td>
                         </tr>
                     `;
                 });
@@ -1102,31 +1064,6 @@
                         </tbody>
                     </table>
                 `;
-                
-                // If current run is not in top 10, show their rank
-                if (currentRunId) {
-                    const currentRunInTop10 = runs.some(run => run.id === currentRunId);
-                    if (!currentRunInTop10) {
-                        const allSnapshot = await database.ref('runs').orderByChild('distance').once('value');
-                        const allRuns = [];
-                        allSnapshot.forEach((childSnapshot) => {
-                            allRuns.push({
-                                id: childSnapshot.key,
-                                ...childSnapshot.val()
-                            });
-                        });
-                        allRuns.sort((a, b) => b.distance - a.distance);
-                        const rank = allRuns.findIndex(run => run.id === currentRunId) + 1;
-                        
-                        if (rank > 0) {
-                            tableHTML += `
-                                <div style="margin-top: 20px; padding: 16px; background: #dbeafe; border-radius: 8px; text-align: center;">
-                                    <strong>Your Rank: #${rank}</strong>
-                                </div>
-                            `;
-                        }
-                    }
-                }
                 
                 document.getElementById('leaderboard-body').innerHTML = tableHTML;
                 
