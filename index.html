@@ -890,52 +890,180 @@
             currentTouchX = null;
         }, { passive: false });
         
-        async function saveRunToLeaderboardApi(distance, collisions, maxSize, name = "Anonymous") {
+        const LEADERBOARD_CACHE_KEY = "snowballLeaderboardCache";
+        const LEADERBOARD_CACHE_MAX_AGE_MS = 60 * 1000;
+        let leaderboardRefreshPromise = null;
+
+        function getCachedLeaderboard() {
             try {
-                const response = await fetch(LEADERBOARD_API_URL, {
-                    method: "POST",
-                    body: JSON.stringify({
-                        action: "save",
-                        name: name,
-                        distance: distance,
-                        collisions: collisions,
-                        maxSize: maxSize
-                    })
-                });
+                const raw = localStorage.getItem(LEADERBOARD_CACHE_KEY);
+                if (!raw) return null;
 
-                const result = await response.json();
+                const cached = JSON.parse(raw);
+                if (!cached || !Array.isArray(cached.runs)) return null;
 
-                if (!result.success) {
-                    throw new Error(result.error || "Leaderboard save failed");
-                }
-
-                return result.id || null;
+                return cached;
             } catch (error) {
-                console.error("Error saving run:", error);
-                alert("Sorry, your run could not be saved to the online leaderboard. Please try again.");
+                console.warn("Could not read leaderboard cache:", error);
                 return null;
             }
         }
+
+        function setCachedLeaderboard(runs) {
+            try {
+                localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify({
+                    savedAt: Date.now(),
+                    runs: Array.isArray(runs) ? runs : []
+                }));
+            } catch (error) {
+                console.warn("Could not save leaderboard cache:", error);
+            }
+        }
+
+        function sortRuns(runs) {
+            return (Array.isArray(runs) ? runs : [])
+                .slice()
+                .sort((a, b) => Number(b.distance) - Number(a.distance));
+        }
+
+        async function fetchLeaderboardFromApi() {
+            const response = await fetch(`${LEADERBOARD_API_URL}?action=leaderboard&cacheBust=${Date.now()}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || "Leaderboard load failed");
+            }
+
+            const runs = sortRuns(result.runs);
+            setCachedLeaderboard(runs);
+            return runs;
+        }
+
+        function refreshLeaderboardInBackground({ updateVisibleModal = false } = {}) {
+            if (leaderboardRefreshPromise) {
+                return leaderboardRefreshPromise;
+            }
+
+            leaderboardRefreshPromise = fetchLeaderboardFromApi()
+                .then(runs => {
+                    if (updateVisibleModal && !document.getElementById('leaderboard-modal').classList.contains('hidden')) {
+                        renderLeaderboard(runs, "Updated just now");
+                    }
+                    return runs;
+                })
+                .catch(error => {
+                    console.error("Error refreshing leaderboard:", error);
+                    return null;
+                })
+                .finally(() => {
+                    leaderboardRefreshPromise = null;
+                });
+
+            return leaderboardRefreshPromise;
+        }
+
+        function renderLeaderboard(runs, statusText = "") {
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            runs = sortRuns(runs);
+
+            if (runs.length === 0) {
+                leaderboardBody.innerHTML = `
+                    <div class="empty-state">
+                        <p>No runs yet!</p>
+                        <p style="font-size: 0.9em;">Be the first to set a record!</p>
+                        ${statusText ? `<p style="font-size: 0.85em; color: #6b7280;">${escapeHTML(statusText)}</p>` : ""}
+                    </div>
+                `;
+                return;
+            }
+
+            let tableHTML = `
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th class="rank-col">Rank</th>
+                            <th class="name-col">Name</th>
+                            <th class="distance-col">Distance</th>
+                            <th class="collisions-col">Hits</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            runs.forEach((run, index) => {
+                const rank = index + 1;
+                let rankDisplay = `#${rank}`;
+
+                if (rank === 1) rankDisplay = '🥇';
+                else if (rank === 2) rankDisplay = '🥈';
+                else if (rank === 3) rankDisplay = '🥉';
+
+                const isCurrentRun = currentRunId && run.id === currentRunId;
+                const highlightClass = isCurrentRun ? 'highlight' : '';
+
+                tableHTML += `
+                    <tr class="${highlightClass}">
+                        <td class="rank-col">${rankDisplay}</td>
+                        <td class="name-col">${escapeHTML(run.name || "Anonymous")}</td>
+                        <td class="distance-col">${Number(run.distance) || 0}</td>
+                        <td class="collisions-col">${Number(run.collisions) || 0}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+                ${statusText ? `<p style="font-size: 0.85em; color: #6b7280; text-align:center; margin-top: 12px;">${escapeHTML(statusText)}</p>` : ""}
+            `;
+
+            leaderboardBody.innerHTML = tableHTML;
+        }
+
+        function getLeaderboardForImmediateDisplay() {
+            const cached = getCachedLeaderboard();
+            if (cached && Array.isArray(cached.runs)) {
+                return {
+                    runs: cached.runs,
+                    isFresh: Date.now() - Number(cached.savedAt || 0) < LEADERBOARD_CACHE_MAX_AGE_MS
+                };
+            }
+
+            return { runs: [], isFresh: false };
+        }
+
+        async function saveRunToLeaderboardApi(distance, collisions, maxSize, name = "Anonymous") {
+            const response = await fetch(LEADERBOARD_API_URL, {
+                method: "POST",
+                body: JSON.stringify({
+                    action: "save",
+                    name: name,
+                    distance: distance,
+                    collisions: collisions,
+                    maxSize: maxSize
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || "Leaderboard save failed");
+            }
+
+            return result;
+        }
         
         async function getRankForDistance(distance) {
-            try {
-                const response = await fetch(`${LEADERBOARD_API_URL}?action=leaderboard`);
-                const result = await response.json();
+            const cached = getCachedLeaderboard();
+            let runs = cached && Array.isArray(cached.runs) ? cached.runs : [];
 
-                if (!result.success) {
-                    throw new Error(result.error || "Leaderboard load failed");
-                }
-
-                const runs = Array.isArray(result.runs) ? result.runs : [];
-                const rank = runs.findIndex(run => Number(run.distance) <= distance) + 1;
-
-                // The current Apps Script returns the top 10 leaderboard.
-                // If this score is below the visible top 10, show the next possible rank.
-                return rank || runs.length + 1;
-            } catch (error) {
-                console.error("Error getting rank:", error);
-                return null;
+            if (!runs.length) {
+                const refreshed = await refreshLeaderboardInBackground();
+                runs = Array.isArray(refreshed) ? refreshed : [];
             }
+
+            const rank = sortRuns(runs).findIndex(run => Number(run.distance) <= distance) + 1;
+            return rank || runs.length + 1;
         }
         
         function openLogRunModal() {
@@ -954,7 +1082,7 @@
                 document.getElementById('player-name').value = savedName;
             }
             
-            // Get and display rank
+            document.getElementById('log-rank').innerHTML = '<strong>Current Rank:</strong> checking...';
             getRankForDistance(score).then(rank => {
                 if (rank !== null) {
                     let rankBadgeClass = '';
@@ -974,20 +1102,30 @@
             document.getElementById('log-run-modal').classList.add('hidden');
         }
         
-        async function saveRunToLeaderboard() {
+        function saveRunToLeaderboard() {
             const playerName = document.getElementById('player-name').value.trim() || "Anonymous";
             
             // Save name to localStorage for next time
             if (playerName !== "Anonymous") {
                 localStorage.setItem('playerName', playerName);
             }
-            
-            // Save the run to the Google Sheets leaderboard
-            const runId = await saveRunToLeaderboardApi(score, collisions, currentMaxSize, playerName);
-            currentRunId = runId;
-            
-            // Mark run as logged
+
+            const optimisticRun = {
+                id: `local-${Date.now()}`,
+                timestamp: Date.now(),
+                name: playerName,
+                distance: score,
+                collisions: collisions,
+                maxSize: currentMaxSize
+            };
+
+            currentRunId = optimisticRun.id;
             runHasBeenLogged = true;
+
+            const cached = getCachedLeaderboard();
+            const cachedRuns = cached && Array.isArray(cached.runs) ? cached.runs : [];
+            const optimisticRuns = sortRuns([...cachedRuns, optimisticRun]).slice(0, 10);
+            setCachedLeaderboard(optimisticRuns);
             
             closeLogRunModal();
             
@@ -997,85 +1135,45 @@
                 logButton.style.display = 'none';
             }
             
-            // Show success message or open leaderboard
-            openLeaderboard();
+            // Show the leaderboard immediately using the local optimistic cache.
+            openLeaderboard("Saving your run...");
+
+            // Save in the background, then refresh the leaderboard from Google Sheets.
+            saveRunToLeaderboardApi(score, collisions, currentMaxSize, playerName)
+                .then(result => {
+                    currentRunId = result.id || currentRunId;
+                    return refreshLeaderboardInBackground({ updateVisibleModal: true });
+                })
+                .catch(error => {
+                    console.error("Error saving run:", error);
+                    renderLeaderboard(optimisticRuns, "Could not confirm save. Please check your connection and try again.");
+                    runHasBeenLogged = false;
+                    if (logButton) {
+                        logButton.style.display = 'inline-block';
+                    }
+                });
         }
         
-        async function openLeaderboard() {
+        function openLeaderboard(statusText = "") {
             document.getElementById('leaderboard-modal').classList.remove('hidden');
-            document.getElementById('leaderboard-body').innerHTML = '<div class="loading">Loading leaderboard...</div>';
-            
-            try {
-                const response = await fetch(`${LEADERBOARD_API_URL}?action=leaderboard`);
-                const result = await response.json();
 
-                if (!result.success) {
-                    throw new Error(result.error || "Leaderboard load failed");
-                }
+            const cached = getLeaderboardForImmediateDisplay();
+            if (cached.runs.length) {
+                renderLeaderboard(cached.runs, statusText || (cached.isFresh ? "" : "Refreshing..."));
+            } else {
+                document.getElementById('leaderboard-body').innerHTML = '<div class="loading">Loading leaderboard...</div>';
+            }
 
-                const runs = Array.isArray(result.runs) ? result.runs : [];
-                runs.sort((a, b) => Number(b.distance) - Number(a.distance));
-                
-                if (runs.length === 0) {
+            refreshLeaderboardInBackground({ updateVisibleModal: true }).then(runs => {
+                if (!runs && !cached.runs.length) {
                     document.getElementById('leaderboard-body').innerHTML = `
                         <div class="empty-state">
-                            <p>No runs yet!</p>
-                            <p style="font-size: 0.9em;">Be the first to set a record!</p>
+                            <p>Error loading leaderboard</p>
+                            <p style="font-size: 0.9em;">Please try again later</p>
                         </div>
                     `;
-                    return;
                 }
-                
-                let tableHTML = `
-                    <table class="leaderboard-table">
-                        <thead>
-                            <tr>
-                                <th class="rank-col">Rank</th>
-                                <th class="name-col">Name</th>
-                                <th class="distance-col">Distance</th>
-                                <th class="collisions-col">Hits</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                runs.forEach((run, index) => {
-                    const rank = index + 1;
-                    let rankDisplay = `#${rank}`;
-                    
-                    if (rank === 1) rankDisplay = '🥇';
-                    else if (rank === 2) rankDisplay = '🥈';
-                    else if (rank === 3) rankDisplay = '🥉';
-                    
-                    const isCurrentRun = currentRunId && run.id === currentRunId;
-                    const highlightClass = isCurrentRun ? 'highlight' : '';
-                    
-                    tableHTML += `
-                        <tr class="${highlightClass}">
-                            <td class="rank-col">${rankDisplay}</td>
-                            <td class="name-col">${escapeHTML(run.name || "Anonymous")}</td>
-                            <td class="distance-col">${Number(run.distance) || 0}</td>
-                            <td class="collisions-col">${Number(run.collisions) || 0}</td>
-                        </tr>
-                    `;
-                });
-                
-                tableHTML += `
-                        </tbody>
-                    </table>
-                `;
-                
-                document.getElementById('leaderboard-body').innerHTML = tableHTML;
-                
-            } catch (error) {
-                console.error("Error loading leaderboard:", error);
-                document.getElementById('leaderboard-body').innerHTML = `
-                    <div class="empty-state">
-                        <p>Error loading leaderboard</p>
-                        <p style="font-size: 0.9em;">Please try again later</p>
-                    </div>
-                `;
-            }
+            });
         }
         
         function closeLeaderboard() {
@@ -1103,6 +1201,9 @@
                 e.stopPropagation();
                 pauseGame();
             });
+
+            // Warm the local leaderboard cache shortly after the app loads.
+            refreshLeaderboardInBackground();
         });
         
         function resumeFromPause() {
