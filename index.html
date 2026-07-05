@@ -952,15 +952,24 @@
             return runs;
         }
 
-        function refreshLeaderboardInBackground({ updateVisibleModal = false, force = false } = {}) {
+        function refreshLeaderboardInBackground({ updateVisibleModal = false, force = false, statusText = "Updated just now" } = {}) {
             if (leaderboardRefreshPromise && !force) {
+                // If a refresh was already started during app load, still attach a renderer
+                // so an already-open leaderboard modal updates when that request finishes.
+                if (updateVisibleModal) {
+                    leaderboardRefreshPromise.then(runs => {
+                        if (runs && !document.getElementById('leaderboard-modal').classList.contains('hidden')) {
+                            renderLeaderboard(runs, statusText);
+                        }
+                    });
+                }
                 return leaderboardRefreshPromise;
             }
 
             const refreshPromise = fetchLeaderboardFromApi()
                 .then(runs => {
                     if (updateVisibleModal && !document.getElementById('leaderboard-modal').classList.contains('hidden')) {
-                        renderLeaderboard(runs, "Updated just now");
+                        renderLeaderboard(runs, statusText);
                     }
                     return runs;
                 })
@@ -1188,11 +1197,25 @@
             if (cached.runs.length) {
                 renderLeaderboard(cached.runs, statusText || (cached.isFresh ? "" : "Refreshing..."));
             } else {
-                document.getElementById('leaderboard-body').innerHTML = '<div class="loading">Loading leaderboard...</div>';
+                document.getElementById('leaderboard-body').innerHTML = `
+                    <div class="loading">
+                        Loading leaderboard...<br>
+                        <span style="font-size: 0.85em; color: #6b7280;">First load can take a few seconds.</span>
+                    </div>
+                `;
             }
 
-            refreshLeaderboardInBackground({ updateVisibleModal: true }).then(runs => {
-                if (!runs && !cached.runs.length) {
+            refreshLeaderboardInBackground({ updateVisibleModal: true, statusText: "Updated just now" }).then(runs => {
+                if (runs) {
+                    // Always render here too. This guarantees the open modal updates even if
+                    // the refresh was started before the modal opened.
+                    if (!document.getElementById('leaderboard-modal').classList.contains('hidden')) {
+                        renderLeaderboard(runs, "Updated just now");
+                    }
+                    return;
+                }
+
+                if (!cached.runs.length) {
                     document.getElementById('leaderboard-body').innerHTML = `
                         <div class="empty-state">
                             <p>Error loading leaderboard</p>
